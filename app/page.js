@@ -1,103 +1,558 @@
-import Image from "next/image";
+'use client'
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const { user, logout, loading } = useAuth();
+  const pathname = usePathname();
+  const [isScrolling, setIsScrolling] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalImage, setModalImage] = useState({ src: '', alt: '', label: '' });
+  const [galleryItems, setGalleryItems] = useState([]);
+  const [bannerData, setBannerData] = useState(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const windowHeight = window.innerHeight;
+      const threshold = windowHeight * 0.1;
+      
+      setIsScrolling(scrollTop > threshold);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll();
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    // Load gallery items and banner from database
+    const loadData = async () => {
+      try {
+        // Load gallery items
+        const galleryResponse = await fetch('/api/gallery');
+        const galleryData = await galleryResponse.json();
+        
+        if (galleryResponse.ok) {
+          setGalleryItems(galleryData.items);
+        } else {
+          console.error('Failed to load gallery items:', galleryData.error);
+          // Fallback to static items if API fails
+          setGalleryItems(getStaticGalleryItems());
+        }
+
+        // Load banner data
+        const bannerResponse = await fetch('/api/banner');
+        const bannerData = await bannerResponse.json();
+        
+        if (bannerResponse.ok) {
+          setBannerData(bannerData.banner);
+        } else {
+          console.error('Failed to load banner:', bannerData.error);
+        }
+      } catch (error) {
+        console.error('Data loading error:', error);
+        // Fallback to static items if API fails
+        setGalleryItems(getStaticGalleryItems());
+      }
+    };
+
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+    };
+
+    if (modalOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'auto';
+    };
+  }, [modalOpen]);
+
+  const openModal = (src, alt, label) => {
+    setModalImage({ src, alt, label });
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setModalImage({ src: '', alt: '', label: '' });
+  };
+
+  const getStaticGalleryItems = () => [
+    { id: 1, path: "data:image/svg+xml,%3Csvg width='400' height='250' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='400' height='250' fill='%23f8f9fa'/%3E%3Cg%3E%3Ccircle cx='150' cy='80' r='15' fill='%23e74c3c'/%3E%3Cpath d='M100 120 Q 200 100 300 120' stroke='%23c0392b' stroke-width='3' fill='none'/%3E%3Ccircle cx='120' cy='140' r='20' fill='%23fff'/%3E%3Ccircle cx='180' cy='130' r='20' fill='%23fff'/%3E%3Ccircle cx='250' cy='140' r='20' fill='%23fff'/%3E%3Ccircle cx='280' cy='80' r='15' fill='%23e74c3c'/%3E%3Cpath d='M150 60 Q 180 50 220 65' fill='%2327ae60'/%3E%3C/g%3E%3C/svg%3E", title: "Food ingredients" },
+    { id: 2, path: "data:image/svg+xml,%3Csvg width='400' height='250' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='sky' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' style='stop-color:%2387ceeb'/%3E%3Cstop offset='100%25' style='stop-color:%23e0f6ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='400' height='250' fill='url(%23sky)'/%3E%3Ctext x='200' y='130' font-family='Arial, sans-serif' font-size='48' font-weight='bold' text-anchor='middle' fill='%23fff' style='text-shadow: 2px 2px 4px rgba(0,0,0,0.3)'%3EWhisk%3C/text%3E%3C/svg%3E", title: "Whisk logo" },
+    { id: 3, path: "data:image/svg+xml,%3Csvg width='400' height='250' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='400' height='250' fill='%238b4513'/%3E%3Ccircle cx='120' cy='80' r='25' fill='%23daa520'/%3E%3Ccircle cx='200' cy='120' r='30' fill='%23ffd700'/%3E%3Ccircle cx='280' cy='90' r='20' fill='%23ff6b6b'/%3E%3Ccircle cx='150' cy='180' r='15' fill='%234ecdc4'/%3E%3Ccircle cx='250' cy='160' r='18' fill='%23ff8c94'/%3E%3Crect x='80' y='60' width='80' height='100' rx='10' fill='%23d4a574'/%3E%3C/svg%3E", title: "Toys and objects" }
+  ];
+
+  return (
+    <div style={{ 
+      background: '#f4d03f', 
+      minHeight: '100vh', 
+      fontFamily: 'Arial, sans-serif',
+      overflowX: 'hidden',
+      margin: 0,
+      padding: 0,
+      paddingTop: 0
+    }}>
+      <style jsx>{`
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+
+        .enter-tool {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: rgba(0, 0, 0, 0.8);
+          color: white;
+          padding: 8px 16px;
+          border-radius: 20px;
+          font-size: 12px;
+          z-index: 1000;
+          cursor: pointer;
+        }
+
+        .page-title {
+          text-align: center;
+          padding: 10px 20px 60px 20px;
+          margin-top: 0px;
+        }
+
+        .page-title h1 {
+          font-size: 3rem;
+          font-weight: bold;
+          color: #333;
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+          margin: 0 0 10px 0;
+          letter-spacing: 2px;
+        }
+
+        .subtitle {
+          font-size: 1.2rem;
+          color: #666;
+          max-width: 800px;
+          margin: 0 auto;
+          line-height: 1.6;
+          font-weight: 400;
+        }
+
+        .main-banner {
+          width: 100%;
+          max-width: 1200px;
+          height: 450px;
+          margin: 40px auto 10px auto;
+          position: relative;
+          overflow: hidden;
+          border-radius: 8px;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .main-banner-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .main-banner-placeholder {
+          width: 100%;
+          height: 100%;
+          background: #e0e0e0;
+          border: 2px dashed #999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+        }
+
+        .main-banner-placeholder::after {
+          content: 'Main Banner Area (450px height)';
+          color: #999;
+          font-size: 1.2rem;
+          font-weight: 500;
+          position: absolute;
+        }
+
+        .section-title {
+          text-align: center;
+          margin: 0 0 40px 0;
+        }
+
+        .section-title h2 {
+          font-size: 2.5rem;
+          font-weight: bold;
+          color: #333;
+          margin: 0;
+          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+
+        .gallery-container {
+          padding: 20px 40px 80px 40px;
+          max-width: 1200px;
+          margin: 0 auto;
+        }
+
+        .gallery-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 50px;
+          perspective: 1000px;
+        }
+
+        .card {
+          aspect-ratio: 16/10;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+          transition: transform 0.6s ease-out, box-shadow 0.3s ease;
+          transform-style: preserve-3d;
+          position: relative;
+          cursor: pointer;
+        }
+
+        .card img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .card-label {
+          position: absolute;
+          top: 10px;
+          left: 10px;
+          background: rgba(0, 0, 0, 0.7);
+          color: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 10px;
+          text-transform: uppercase;
+        }
+
+        .gallery-grid .card {
+          transform: rotate(20deg);
+        }
+
+        .straightened .card {
+          transform: scale(1.05) rotate(0deg) !important;
+          box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4) !important;
+        }
+
+        .gallery-grid .card:hover {
+          transform: scale(1.05) rotate(0deg);
+          box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+          z-index: 10;
+        }
+
+        .modal {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.9);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 9999;
+          transition: opacity 0.3s ease;
+        }
+
+        .modal-content {
+          position: relative;
+          max-width: 80vw;
+          max-height: 80vh;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+          transform: scale(0.8);
+          transition: transform 0.3s ease;
+          z-index: 10000;
+        }
+
+        .modal.active .modal-content {
+          transform: scale(1);
+        }
+
+        .modal-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .modal-card-label {
+          position: absolute;
+          top: 15px;
+          left: 15px;
+          background: rgba(0, 0, 0, 0.7);
+          color: white;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-size: 12px;
+          text-transform: uppercase;
+          z-index: 10002;
+        }
+
+        .modal-close {
+          position: absolute;
+          top: 15px;
+          right: 15px;
+          background: rgba(0, 0, 0, 0.7);
+          color: white;
+          border: none;
+          border-radius: 50%;
+          width: 40px;
+          height: 40px;
+          font-size: 20px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 0.3s ease;
+          z-index: 10003;
+        }
+
+        .modal-close:hover {
+          background: rgba(0, 0, 0, 0.9);
+        }
+
+        @media (max-width: 768px) {
+          .category-menu ul {
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 4px;
+          }
+          
+          .category-menu a {
+            padding: 10px 16px;
+            font-size: 13px;
+          }
+          
+          .gallery-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+          }
+          
+          .gallery-container {
+            padding: 20px 20px 40px 20px;
+          }
+          
+          .page-title h1 {
+            font-size: 2.5rem;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .category-menu ul {
+            flex-direction: column;
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto;
+          }
+          
+          .gallery-grid {
+            grid-template-columns: 1fr;
+            gap: 15px;
+          }
+          
+          .page-title h1 {
+            font-size: 2rem;
+          }
+        }
+
+        nav a {
+          color: #374151;
+          transition: color 0.3s ease;
+          padding: 0.5rem 0.75rem;
+          border-radius: 0.375rem;
+          font-size: 0.875rem;
+          font-weight: 500;
+          text-decoration: none;
+        }
+
+        nav a:hover {
+          color: #4f46e5;
+        }
+
+        nav {
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        nav .nav-container {
+          max-width: 80rem;
+          margin: 0 auto;
+          padding: 0 1rem;
+        }
+
+        @media (min-width: 640px) {
+          nav .nav-container {
+            padding: 0 1.5rem;
+          }
+        }
+
+        @media (min-width: 1024px) {
+          nav .nav-container {
+            padding: 0 2rem;
+          }
+        }
+
+        .nav-content {
+          display: flex;
+          justify-content: space-between;
+          height: 4rem;
+        }
+
+        .logo-section {
+          display: flex;
+          align-items: center;
+        }
+
+        .menu-section {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+      `}</style>
+
+      <nav style={{ background: '#f4d03f' }}>
+        <div className="nav-container">
+          <div className="nav-content">
+            <div className="logo-section">
+              <a href="/" style={{ textDecoration: 'none' }}>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#4f46e5', margin: 0, fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>NavaAiStudio</h1>
+              </a>
+            </div>
+            <div className="menu-section">
+              <a 
+                href="/" 
+                style={{
+                  fontWeight: pathname === '/' ? 'bold' : 'normal',
+                  color: pathname === '/' ? '#4f46e5' : '#374151'
+                }}
+              >
+                Home
+              </a>
+              <a 
+                href="/service-request"
+                style={{
+                  fontWeight: pathname === '/service-request' ? 'bold' : 'normal',
+                  color: pathname === '/service-request' ? '#4f46e5' : '#374151'
+                }}
+              >
+                Service Request
+              </a>
+              <a 
+                href="/sns-settings"
+                style={{
+                  fontWeight: pathname === '/sns-settings' ? 'bold' : 'normal',
+                  color: pathname === '/sns-settings' ? '#4f46e5' : '#374151'
+                }}
+              >
+                Social Media Settings
+              </a>
+              {user && user.role === 'ADMIN' && (
+                <a 
+                  href="/admin"
+                  style={{
+                    fontWeight: pathname === '/admin' ? 'bold' : 'normal',
+                    color: pathname === '/admin' ? '#4f46e5' : '#374151'
+                  }}
+                >
+                  Admin
+                </a>
+              )}
+              {user ? (
+                <button 
+                  onClick={logout}
+                  style={{
+                    background: '#ef4444',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.25rem',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem'
+                  }}
+                  onMouseOver={(e) => e.target.style.background = '#dc2626'}
+                  onMouseOut={(e) => e.target.style.background = '#ef4444'}
+                >
+                  Logout
+                </button>
+              ) : (
+                <a href="/login">Login</a>
+              )}
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+      </nav>
+      
+      {/* Main Banner */}
+      <div className="main-banner">
+        {bannerData ? (
+          <img
+            src={bannerData.path}
+            alt={bannerData.title || 'Main Banner'}
+            className="main-banner-image"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        ) : (
+          <div className="main-banner-placeholder">
+            {/* Blank banner placeholder */}
+          </div>
+        )}
+      </div>
+
+      <div className="page-title">
+        <p className="subtitle">Empowering small businesses and local companies with AI-driven ad creation, SNS marketing, and strategic brand growth support</p>
+      </div>
+      
+      {/* Our Works Section Title */}
+      <div className="section-title">
+        <h2>Our Works</h2>
+      </div>
+      
+      <div className="gallery-container">
+        <div className={`gallery-grid ${isScrolling ? 'straightened' : ''}`}>
+          {galleryItems.map((item, index) => (
+            <div 
+              key={item.id || index}
+              className="card" 
+              onClick={() => openModal(item.path, item.title, item.title.toUpperCase())}
+            >
+              <div className="card-label">{item.title.toUpperCase()}</div>
+              <img src={item.path} alt={item.title} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Modal for popup */}
+      {modalOpen && (
+        <div className={`modal ${modalOpen ? 'active' : ''}`} onClick={closeModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={closeModal}>&times;</button>
+            <div className="modal-card-label">{modalImage.label}</div>
+            <img className="modal-image" src={modalImage.src} alt={modalImage.alt} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
