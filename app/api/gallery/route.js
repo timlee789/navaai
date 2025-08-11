@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
-import { writeFile } from 'fs/promises';
-import path from 'path';
+import { uploadFile } from '@/lib/supabase';
 
 // Extract user information from token
 function getUserFromToken(request) {
@@ -59,14 +58,15 @@ export async function POST(request) {
       );
     }
 
-    // File upload processing
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    // File upload processing with Supabase Storage
+    const uploadResult = await uploadFile(file, 'uploads', 'gallery');
     
-    const filename = `gallery-${Date.now()}-${Math.random().toString(36).substring(2)}-${file.name}`;
-    const filepath = path.join(process.cwd(), 'public', 'uploads', filename);
-    
-    await writeFile(filepath, buffer);
+    if (!uploadResult.success) {
+      return NextResponse.json(
+        { error: `File upload failed: ${uploadResult.error}` },
+        { status: 500 }
+      );
+    }
 
     // Get the highest order number and increment
     const lastItem = await prisma.galleryItem.findFirst({
@@ -78,11 +78,11 @@ export async function POST(request) {
       data: {
         title,
         description,
-        filename,
-        originalName: file.name,
-        mimetype: file.type,
-        size: file.size,
-        path: `/uploads/${filename}`,
+        filename: uploadResult.filename,
+        originalName: uploadResult.originalName,
+        mimetype: uploadResult.mimetype,
+        size: uploadResult.size,
+        path: uploadResult.url,
         order: newOrder
       }
     });

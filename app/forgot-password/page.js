@@ -51,7 +51,7 @@ export default function ForgotPassword() {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <a href="/" style={{ textDecoration: 'none' }}>
-                <h1 className="text-2xl font-bold text-indigo-600" style={{ fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>NavaAiStudio</h1>
+                <h1 className="text-2xl font-bold text-indigo-600" style={{ fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>AiStudio7.com</h1>
               </a>
             </div>
             <div className="flex items-center space-x-4">

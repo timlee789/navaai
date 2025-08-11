@@ -436,7 +436,7 @@ export default function Home() {
           <div className="nav-content">
             <div className="logo-section">
               <a href="/" style={{ textDecoration: 'none' }}>
-                <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#4f46e5', margin: 0, fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>NavaAiStudio</h1>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#4f46e5', margin: 0, fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>AiStudio7.com</h1>
               </a>
             </div>
             <div className="menu-section">
@@ -448,6 +448,24 @@ export default function Home() {
                 }}
               >
                 Home
+              </a>
+              <a 
+                href="/services"
+                style={{
+                  fontWeight: pathname === '/services' ? 'bold' : 'normal',
+                  color: pathname === '/services' ? '#4f46e5' : '#374151'
+                }}
+              >
+                Services
+              </a>
+              <a 
+                href="/client-portal"
+                style={{
+                  fontWeight: pathname === '/client-portal' ? 'bold' : 'normal',
+                  color: pathname === '/client-portal' ? '#4f46e5' : '#374151'
+                }}
+              >
+                My Portal
               </a>
               <a 
                 href="/service-request"
@@ -465,7 +483,7 @@ export default function Home() {
                   color: pathname === '/sns-settings' ? '#4f46e5' : '#374151'
                 }}
               >
-                Social Media Settings
+                SNS Settings
               </a>
               {user && user.role === 'ADMIN' && (
                 <a 

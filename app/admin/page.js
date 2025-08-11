@@ -20,7 +20,7 @@ export default function AdminDashboard() {
   });
   
   // Gallery management state
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders', 'gallery', or 'banner'
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders', 'payments', 'gallery', or 'banner'
   const [galleryItems, setGalleryItems] = useState([]);
   const [showGalleryUpload, setShowGalleryUpload] = useState(false);
   const [galleryUploadFile, setGalleryUploadFile] = useState(null);
@@ -35,6 +35,22 @@ export default function AdminDashboard() {
   const [bannerTitle, setBannerTitle] = useState('');
   const [bannerDescription, setBannerDescription] = useState('');
   const [bannerLoading, setBannerLoading] = useState(false);
+
+  // Payment management state
+  const [payments, setPayments] = useState([]);
+  const [paymentStats, setPaymentStats] = useState({
+    totalPayments: 0,
+    totalAmount: 0,
+    pendingPayments: 0,
+    completedPayments: 0,
+    failedPayments: 0
+  });
+  const [paymentFilter, setPaymentFilter] = useState('ALL'); // ALL, PENDING, COMPLETED, FAILED
+  const [selectedPayment, setSelectedPayment] = useState(null);
+  
+  // Customer details with payments state
+  const [selectedCustomerDetails, setSelectedCustomerDetails] = useState(null);
+  const [loadingCustomerDetails, setLoadingCustomerDetails] = useState(false);
   
   const router = useRouter();
   const pathname = usePathname();
@@ -58,7 +74,9 @@ export default function AdminDashboard() {
     }
     
     loadOrders();
-    if (activeTab === 'gallery') {
+    if (activeTab === 'payments') {
+      loadPayments();
+    } else if (activeTab === 'gallery') {
       loadGalleryItems();
     } else if (activeTab === 'banner') {
       loadBannerData();
@@ -91,6 +109,24 @@ export default function AdminDashboard() {
       completedOrders: ordersList.filter(order => order.status === 'COMPLETED').length
     };
     setStats(stats);
+  };
+
+  const loadPayments = async () => {
+    try {
+      console.log('🏦 Loading payments...');
+      const response = await fetch('/api/admin/payments');
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log('✅ Payments loaded:', data.payments.length);
+        setPayments(data.payments);
+        setPaymentStats(data.stats);
+      } else {
+        console.error('Failed to load payments:', data.error);
+      }
+    } catch (error) {
+      console.error('Payment loading error:', error);
+    }
   };
 
   const updateOrderStatus = async (orderId, status) => {
@@ -202,6 +238,68 @@ export default function AdminDashboard() {
     const [year, month, day] = dateStr.split('-').map(Number);
     const localDate = new Date(year, month - 1, day);
     return localDate.toLocaleDateString('en-US');
+  };
+
+  // Payment utility functions
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'COMPLETED': return 'bg-green-100 text-green-800';
+      case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+      case 'FAILED': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPaymentStatusText = (status) => {
+    switch (status) {
+      case 'COMPLETED': return 'Completed';
+      case 'PENDING': return 'Pending';
+      case 'FAILED': return 'Failed';
+      default: return status;
+    }
+  };
+
+  const getServiceTypeText = (type) => {
+    switch (type) {
+      case 'PLAN': return 'Service Plan';
+      case 'OTHER_SERVICE': return 'Other Service';
+      default: return type;
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
+  const filteredPayments = payments.filter(payment => {
+    if (paymentFilter === 'ALL') return true;
+    return payment.status === paymentFilter;
+  });
+
+  // Load customer details with payment history
+  const loadCustomerDetails = async (customer) => {
+    setLoadingCustomerDetails(true);
+    try {
+      console.log('👤 Loading customer details for:', customer.email);
+      const response = await fetch(`/api/admin/user-payments/${customer.id}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log('✅ Customer details loaded:', data.user);
+        setSelectedCustomerDetails(data.user);
+      } else {
+        console.error('Failed to load customer details:', data.error);
+        alert('Failed to load customer details: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Customer details loading error:', error);
+      alert('An error occurred while loading customer details.');
+    } finally {
+      setLoadingCustomerDetails(false);
+    }
   };
 
   // Gallery management functions
@@ -419,7 +517,7 @@ export default function AdminDashboard() {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <a href="/" style={{ textDecoration: 'none' }}>
-                <h1 className="text-2xl font-bold text-purple-600" style={{ fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>NavaAiStudio - Admin</h1>
+                <h1 className="text-2xl font-bold text-purple-600" style={{ fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>AiStudio7.com - Admin</h1>
               </a>
             </div>
             <div className="flex items-center space-x-4">
@@ -469,6 +567,16 @@ export default function AdminDashboard() {
                 }`}
               >
                 Order Management
+              </button>
+              <button
+                onClick={() => setActiveTab('payments')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'payments'
+                    ? 'border-purple-500 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Payment Management
               </button>
               <button
                 onClick={() => setActiveTab('gallery')}
@@ -595,8 +703,9 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div>
                           <button
-                            onClick={() => setSelectedClient(order.client)}
+                            onClick={() => loadCustomerDetails(order.client)}
                             className="font-medium text-blue-600 hover:text-blue-800 cursor-pointer"
+                            disabled={loadingCustomerDetails}
                           >
                             {order.client?.name}
                           </button>
@@ -896,46 +1005,137 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Customer Information Modal */}
-        {selectedClient && (
+        {/* Customer Details Modal with Payment History */}
+        {selectedCustomerDetails && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
+            <div className="relative top-10 mx-auto p-5 border w-11/12 md:w-5/6 lg:w-4/5 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
               <div className="mt-3">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Customer Information</h3>
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-medium text-gray-900">Customer Details & Payment History</h3>
                   <button
-                    onClick={() => setSelectedClient(null)}
-                    className="text-gray-400 hover:text-gray-600"
+                    onClick={() => setSelectedCustomerDetails(null)}
+                    className="text-gray-400 hover:text-gray-600 text-xl"
                   >
                     ✕
                   </button>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium text-gray-700">Name</h4>
-                    <p className="text-gray-600">{selectedClient.name}</p>
+                {/* Customer Information Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                  {/* Basic Info */}
+                  <div className="bg-blue-50 p-6 rounded-lg">
+                    <h4 className="font-medium text-black text-lg mb-4">👤 Customer Information</h4>
+                    <div className="space-y-3 text-sm text-black">
+                      <div><span className="font-medium text-black">Name:</span> {selectedCustomerDetails.name}</div>
+                      <div><span className="font-medium text-black">Email:</span> {selectedCustomerDetails.email}</div>
+                      {selectedCustomerDetails.company && (
+                        <div><span className="font-medium text-black">Company:</span> {selectedCustomerDetails.company}</div>
+                      )}
+                      <div><span className="font-medium text-black">Phone:</span> {selectedCustomerDetails.phone || 'Not provided'}</div>
+                      <div><span className="font-medium text-black">Role:</span> 
+                        <span className="ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                          {selectedCustomerDetails.role}
+                        </span>
+                      </div>
+                      <div><span className="font-medium text-black">Member Since:</span> {new Date(selectedCustomerDetails.createdAt).toLocaleDateString('en-US')}</div>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-medium text-gray-700">Email</h4>
-                    <p className="text-gray-600">{selectedClient.email}</p>
+
+                  {/* Payment Summary */}
+                  <div className="bg-green-50 p-6 rounded-lg">
+                    <h4 className="font-medium text-black text-lg mb-4">💰 Payment Summary</h4>
+                    <div className="space-y-3 text-sm text-black">
+                      <div><span className="font-medium text-black">Total Payments:</span> {selectedCustomerDetails.payments?.length || 0}</div>
+                      <div>
+                        <span className="font-medium text-black">Total Spent:</span> 
+                        {formatCurrency(selectedCustomerDetails.payments?.filter(p => p.status === 'COMPLETED').reduce((sum, p) => sum + p.amount, 0) || 0)}
+                      </div>
+                      <div>
+                        <span className="font-medium text-black">Completed Payments:</span> 
+                        {selectedCustomerDetails.payments?.filter(p => p.status === 'COMPLETED').length || 0}
+                      </div>
+                      <div>
+                        <span className="font-medium text-black">Pending Payments:</span> 
+                        {selectedCustomerDetails.payments?.filter(p => p.status === 'PENDING').length || 0}
+                      </div>
+                      <div>
+                        <span className="font-medium text-black">Failed Payments:</span> 
+                        {selectedCustomerDetails.payments?.filter(p => p.status === 'FAILED').length || 0}
+                      </div>
+                    </div>
                   </div>
-                  {selectedClient.company && (
-                    <div>
-                      <h4 className="font-medium text-gray-700">Company</h4>
-                      <p className="text-gray-600">{selectedClient.company}</p>
+                </div>
+
+                {/* Payment History */}
+                <div className="bg-white">
+                  <h4 className="font-medium text-black text-lg mb-4">📋 Payment History</h4>
+                  
+                  {selectedCustomerDetails.payments && selectedCustomerDetails.payments.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Date</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Service</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Type</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Amount</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Status</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Details</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {selectedCustomerDetails.payments.map((payment) => (
+                            <tr key={payment.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-black">
+                                <div>{new Date(payment.createdAt).toLocaleDateString('en-US')}</div>
+                                <div className="text-xs text-gray-600">{new Date(payment.createdAt).toLocaleTimeString('en-US')}</div>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-black">
+                                <div className="font-medium">{payment.serviceName}</div>
+                                {payment.serviceDetails && (
+                                  <div className="text-xs text-gray-600">
+                                    {(() => {
+                                      try {
+                                        const details = JSON.parse(payment.serviceDetails);
+                                        return details.description || '';
+                                      } catch (e) {
+                                        return '';
+                                      }
+                                    })()}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-black">
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                  {getServiceTypeText(payment.serviceType)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-black">
+                                {formatCurrency(payment.amount)}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPaymentStatusColor(payment.status)}`}>
+                                  {getPaymentStatusText(payment.status)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-black">
+                                <button
+                                  onClick={() => setSelectedPayment(payment)}
+                                  className="text-purple-600 hover:text-purple-900 text-xs"
+                                >
+                                  View Details
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                      No payment history found for this customer.
                     </div>
                   )}
-                  <div>
-                    <h4 className="font-medium text-gray-700">Phone Number</h4>
-                    <p className="text-gray-600">{selectedClient.phone || 'No information'}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-700">Registration Date</h4>
-                    <p className="text-gray-600">
-                      {new Date(selectedClient.createdAt).toLocaleDateString('en-US')}
-                    </p>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1114,6 +1314,325 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+          </>
+        )}
+
+        {activeTab === 'payments' && (
+          <>
+            {/* Payment Statistics Dashboard */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <span className="text-2xl">💳</span>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Total Payments</p>
+                    <p className="text-2xl font-semibold text-gray-900">{paymentStats.totalPayments}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <span className="text-2xl">💰</span>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+                    <p className="text-2xl font-semibold text-green-900">{formatCurrency(paymentStats.totalAmount)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-yellow-100 rounded-lg">
+                    <span className="text-2xl">⏳</span>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Pending</p>
+                    <p className="text-2xl font-semibold text-yellow-900">{paymentStats.pendingPayments}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <span className="text-2xl">✅</span>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Completed</p>
+                    <p className="text-2xl font-semibold text-green-900">{paymentStats.completedPayments}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <span className="text-2xl">❌</span>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Failed</p>
+                    <p className="text-2xl font-semibold text-red-900">{paymentStats.failedPayments}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Filters */}
+            <div className="bg-white shadow-xl rounded-lg overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium text-gray-900">Payment List</h3>
+                  <div className="flex space-x-2">
+                    <select
+                      value={paymentFilter}
+                      onChange={(e) => setPaymentFilter(e.target.value)}
+                      className="px-3 py-1 border border-gray-300 rounded text-sm text-black"
+                    >
+                      <option value="ALL">All Payments</option>
+                      <option value="PENDING">Pending</option>
+                      <option value="COMPLETED">Completed</option>
+                      <option value="FAILED">Failed</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Payment ID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Customer
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Service
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Amount
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredPayments.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
+                          No payments found.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredPayments.map((payment) => (
+                        <tr key={payment.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {payment.id.slice(-8)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div>
+                              <button
+                                onClick={() => setSelectedPayment(payment)}
+                                className="font-medium text-blue-600 hover:text-blue-800 cursor-pointer"
+                              >
+                                {payment.user?.name}
+                              </button>
+                              <div className="text-gray-500">{payment.user?.email}</div>
+                              {payment.user?.company && (
+                                <div className="text-gray-400 text-xs">{payment.user?.company}</div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div>
+                              <div className="font-medium">{payment.serviceName}</div>
+                              {payment.serviceDetails && (
+                                <div className="text-gray-500 text-xs">
+                                  {JSON.parse(payment.serviceDetails).description}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                              {getServiceTypeText(payment.serviceType)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {formatCurrency(payment.amount)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPaymentStatusColor(payment.status)}`}>
+                              {getPaymentStatusText(payment.status)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <div>
+                              <div>{new Date(payment.createdAt).toLocaleDateString('en-US')}</div>
+                              <div className="text-xs">{new Date(payment.createdAt).toLocaleTimeString('en-US')}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            <button
+                              onClick={() => setSelectedPayment(payment)}
+                              className="text-purple-600 hover:text-purple-900"
+                            >
+                              View Details
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Payment Details Modal */}
+            {selectedPayment && (
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white max-h-[80vh] overflow-y-auto">
+                  <div className="mt-3">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-medium text-gray-900">Payment Details</h3>
+                      <button
+                        onClick={() => setSelectedPayment(null)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="space-y-6">
+                      {/* Payment Information */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <h4 className="font-medium text-black mb-3">Payment Information</h4>
+                          <div className="space-y-2 text-sm text-black">
+                            <div><span className="font-medium text-black">Payment ID:</span> {selectedPayment.id}</div>
+                            <div><span className="font-medium text-black">Amount:</span> {formatCurrency(selectedPayment.amount)}</div>
+                            <div><span className="font-medium text-black">Currency:</span> {selectedPayment.currency.toUpperCase()}</div>
+                            <div>
+                              <span className="font-medium text-black">Status:</span> 
+                              <span className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${getPaymentStatusColor(selectedPayment.status)}`}>
+                                {getPaymentStatusText(selectedPayment.status)}
+                              </span>
+                            </div>
+                            <div><span className="font-medium text-black">Created:</span> {new Date(selectedPayment.createdAt).toLocaleString('en-US')}</div>
+                            {selectedPayment.paidAt && (
+                              <div><span className="font-medium text-black">Paid At:</span> {new Date(selectedPayment.paidAt).toLocaleString('en-US')}</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="bg-blue-50 p-4 rounded-lg">
+                          <h4 className="font-medium text-black mb-3">Customer Information</h4>
+                          <div className="space-y-2 text-sm text-black">
+                            <div><span className="font-medium text-black">Name:</span> {selectedPayment.user?.name}</div>
+                            <div><span className="font-medium text-black">Email:</span> {selectedPayment.user?.email}</div>
+                            {selectedPayment.user?.company && (
+                              <div><span className="font-medium text-black">Company:</span> {selectedPayment.user?.company}</div>
+                            )}
+                            {selectedPayment.user?.phone && (
+                              <div><span className="font-medium text-black">Phone:</span> {selectedPayment.user?.phone}</div>
+                            )}
+                            <div><span className="font-medium text-black">Member Since:</span> {new Date(selectedPayment.user?.createdAt).toLocaleDateString('en-US')}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Service Information */}
+                      <div className="bg-purple-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-black mb-3">Service Information</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-black">
+                          <div>
+                            <div className="mb-2">
+                              <span className="font-medium text-black">Service Name:</span> {selectedPayment.serviceName}
+                            </div>
+                            <div className="mb-2">
+                              <span className="font-medium text-black">Service Type:</span>
+                              <span className="ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                {getServiceTypeText(selectedPayment.serviceType)}
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            {selectedPayment.stripeSessionId && (
+                              <div className="mb-2">
+                                <span className="font-medium text-black">Session ID:</span> 
+                                <span className="ml-2 text-xs font-mono bg-gray-200 px-2 py-1 rounded text-black">
+                                  {selectedPayment.stripeSessionId}
+                                </span>
+                              </div>
+                            )}
+                            {selectedPayment.stripePaymentId && (
+                              <div className="mb-2">
+                                <span className="font-medium text-black">Payment ID:</span>
+                                <span className="ml-2 text-xs font-mono bg-gray-200 px-2 py-1 rounded text-black">
+                                  {selectedPayment.stripePaymentId}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Service Details */}
+                        {selectedPayment.serviceDetails && (
+                          <div className="mt-4 p-3 bg-white rounded border">
+                            <h5 className="font-medium text-black mb-2">Service Details</h5>
+                            <div className="text-sm text-black">
+                              {(() => {
+                                try {
+                                  const details = JSON.parse(selectedPayment.serviceDetails);
+                                  return (
+                                    <div>
+                                      {details.description && (
+                                        <div className="mb-2"><span className="font-medium text-black">Description:</span> {details.description}</div>
+                                      )}
+                                      {details.features && (
+                                        <div>
+                                          <span className="font-medium text-black">Features:</span>
+                                          <ul className="list-disc list-inside ml-4 mt-1 text-black">
+                                            {details.features.map((feature, index) => (
+                                              <li key={index}>{feature}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                      {details.unit && (
+                                        <div className="mt-2"><span className="font-medium text-black">Unit:</span> {details.unit}</div>
+                                      )}
+                                    </div>
+                                  );
+                                } catch (e) {
+                                  return <div className="text-black">{selectedPayment.serviceDetails}</div>;
+                                }
+                              })()}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
 

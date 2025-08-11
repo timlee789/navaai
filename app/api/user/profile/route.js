@@ -5,26 +5,41 @@ import jwt from 'jsonwebtoken';
 // Extract user information from token
 function getUserFromToken(request) {
   try {
+    // Debug: Check all cookies
+    const allCookies = request.cookies.getAll();
+    console.log('🍪 Profile API: All cookies received:', allCookies);
+    
     const token = request.cookies.get('token')?.value;
+    console.log('🍪 Profile API: Token from cookie:', token ? 'present' : 'missing');
+    if (token) {
+      console.log('🍪 Profile API: Token length:', token.length);
+      console.log('🍪 Profile API: Token start:', token.substring(0, 20) + '...');
+    }
     if (!token) return null;
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('✅ Profile API: Token decoded successfully for user:', decoded.userId);
     return decoded;
   } catch (error) {
+    console.error('❌ Profile API: Token verification error:', error.message);
     return null;
   }
 }
 
 // Get user profile (GET)
 export async function GET(request) {
+  console.log('Profile API: GET request received');
   try {
     const user = getUserFromToken(request);
     if (!user) {
+      console.log('Profile API: No user found from token, returning 401');
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       );
     }
+
+    console.log('Profile API: User found from token, fetching profile for:', user.userId);
 
     const userProfile = await prisma.user.findUnique({
       where: { id: user.userId },

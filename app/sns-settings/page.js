@@ -6,6 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function SnsSettings() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  const [hasPaidService, setHasPaidService] = useState(false);
+  const [checkingPayment, setCheckingPayment] = useState(true);
   const [platforms, setPlatforms] = useState([
     {
       id: 'instagram',
@@ -49,16 +51,40 @@ export default function SnsSettings() {
   const [postSettings, setPostSettings] = useState({
     autoPostTiming: 'immediate',
     scheduledTime: '',
-    defaultHashtags: '#navaai #content #creative',
+    defaultHashtags: '#aistudio7 #content #creative',
     contentApprovalRequired: true
   });
 
+  // Check payment status when user changes
+  useEffect(() => {
+    const checkPaymentStatus = async () => {
+      if (!user) {
+        setHasPaidService(false);
+        setCheckingPayment(false);
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/user/payment-status');
+        const data = await response.json();
+        setHasPaidService(data.hasPaidService);
+      } catch (error) {
+        console.error('Failed to check payment status:', error);
+        setHasPaidService(false);
+      } finally {
+        setCheckingPayment(false);
+      }
+    };
+
+    checkPaymentStatus();
+  }, [user]);
+
   // Load SNS settings
   useEffect(() => {
-    if (user) {
+    if (user && hasPaidService) {
       loadSnsSettings();
     }
-  }, [user]);
+  }, [user, hasPaidService]);
 
   const loadSnsSettings = async () => {
     try {
@@ -83,6 +109,8 @@ export default function SnsSettings() {
   };
 
   const openConnectionModal = (platform) => {
+    if (!user || !hasPaidService) return;
+    
     setShowConnectionModal(platform);
     setConnectionForm({
       username: platform.username || '',
@@ -144,6 +172,8 @@ export default function SnsSettings() {
   };
 
   const toggleAutoPost = (platformId) => {
+    if (!user || !hasPaidService) return;
+    
     setPlatforms(prev => prev.map(platform => 
       platform.id === platformId 
         ? { ...platform, autoPost: !platform.autoPost }
@@ -152,6 +182,8 @@ export default function SnsSettings() {
   };
 
   const handleSaveSettings = async () => {
+    if (!user || !hasPaidService) return;
+    
     setLoading(true);
     try {
       const response = await fetch('/api/sns-settings', {
@@ -180,6 +212,9 @@ export default function SnsSettings() {
     }
   };
 
+  const canUseService = user && hasPaidService;
+  const isDisabled = !user || !hasPaidService;
+
   return (
     <div className="min-h-screen" style={{ background: '#f4d03f' }}>
       <nav className="shadow-lg" style={{ background: '#f4d03f' }}>
@@ -187,7 +222,7 @@ export default function SnsSettings() {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <a href="/" style={{ textDecoration: 'none' }}>
-                <h1 className="text-2xl font-bold text-indigo-600" style={{ fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>NavaAiStudio</h1>
+                <h1 className="text-2xl font-bold text-indigo-600" style={{ fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>AiStudio7.com</h1>
               </a>
             </div>
             <div className="flex items-center space-x-4">
@@ -202,14 +237,14 @@ export default function SnsSettings() {
                 Home
               </a>
               <a 
-                href="/service-request" 
+                href="/services" 
                 className="hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium"
                 style={{
-                  fontWeight: pathname === '/service-request' ? 'bold' : 'normal',
-                  color: pathname === '/service-request' ? '#4f46e5' : '#374151'
+                  fontWeight: pathname === '/services' ? 'bold' : 'normal',
+                  color: pathname === '/services' ? '#4f46e5' : '#374151'
                 }}
               >
-                Service Request
+                Services
               </a>
               <a 
                 href="/client-portal" 
@@ -220,6 +255,16 @@ export default function SnsSettings() {
                 }}
               >
                 My Portal
+              </a>
+              <a 
+                href="/service-request" 
+                className="hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium"
+                style={{
+                  fontWeight: pathname === '/service-request' ? 'bold' : 'normal',
+                  color: pathname === '/service-request' ? '#4f46e5' : '#374151'
+                }}
+              >
+                Service Request
               </a>
               <a 
                 href="/sns-settings" 
@@ -266,10 +311,39 @@ export default function SnsSettings() {
           <p className="text-gray-600">Manage social media platform connections and auto-posting settings</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {checkingPayment ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Checking payment status...</p>
+          </div>
+        ) : !user ? (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+            <h3 className="text-lg font-semibold text-blue-800 mb-2">Login Required</h3>
+            <p className="text-blue-700 mb-4">Please log in to access SNS auto-posting settings.</p>
+            <button
+              onClick={() => window.location.href = '/login'}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            >
+              Go to Login
+            </button>
+          </div>
+        ) : !hasPaidService ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
+            <h3 className="text-lg font-semibold text-yellow-800 mb-2">Payment Required</h3>
+            <p className="text-yellow-700 mb-4">SNS auto-posting settings are only available to users with completed payments. Please purchase a service plan to access this feature.</p>
+            <button
+              onClick={() => window.location.href = '/services'}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded"
+            >
+              View Services
+            </button>
+          </div>
+        ) : null}
+
+        <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8 ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
           {/* Platform Connection Settings */}
           <div className="bg-white rounded-lg shadow-xl p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-6">Platform Connections</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-6">Platform Connections {isDisabled && '(Disabled)'}</h3>
             
             <div className="space-y-4">
               {platforms.map((platform) => (
@@ -335,7 +409,7 @@ export default function SnsSettings() {
 
           {/* Posting Settings */}
           <div className="bg-white rounded-lg shadow-xl p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-6">Posting Settings</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-6">Posting Settings {isDisabled && '(Disabled)'}</h3>
             
             <div className="space-y-6">
               <div>
@@ -397,8 +471,8 @@ export default function SnsSettings() {
         </div>
 
         {/* Posting History */}
-        <div className="mt-8 bg-white rounded-lg shadow-xl p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-6">Recent Posting History</h3>
+        <div className={`mt-8 bg-white rounded-lg shadow-xl p-6 ${isDisabled ? 'opacity-50' : ''}`}>
+          <h3 className="text-xl font-semibold text-gray-900 mb-6">Recent Posting History {isDisabled && '(Disabled)'}</h3>
           
           <div className="text-center py-8">
             <span className="text-gray-500">No posting history yet.</span>
@@ -409,10 +483,10 @@ export default function SnsSettings() {
         <div className="mt-8 flex justify-end">
           <button
             onClick={handleSaveSettings}
-            disabled={loading}
+            disabled={isDisabled || loading}
             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-lg"
           >
-            {loading ? 'Saving...' : 'Save Settings'}
+            {isDisabled ? (user ? 'Payment Required' : 'Login Required') : loading ? 'Saving...' : 'Save Settings'}
           </button>
         </div>
 

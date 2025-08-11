@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "NavaAI Studio",
+  title: "AiStudio7.com",
   description: "AI 기반 콘텐츠 제작 서비스",
 };
 

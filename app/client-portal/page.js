@@ -8,6 +8,8 @@ export default function ClientPortal() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [feedbackText, setFeedbackText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [hasPaidService, setHasPaidService] = useState(false);
+  const [checkingPayment, setCheckingPayment] = useState(true);
   
   const { user, logout } = useAuth();
   const pathname = usePathname();
@@ -22,8 +24,32 @@ export default function ClientPortal() {
     return localDate.toLocaleDateString('en-US');
   };
 
+  // Check payment status when user changes
   useEffect(() => {
-    if (user) {
+    const checkPaymentStatus = async () => {
+      if (!user) {
+        setHasPaidService(false);
+        setCheckingPayment(false);
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/user/payment-status');
+        const data = await response.json();
+        setHasPaidService(data.hasPaidService);
+      } catch (error) {
+        console.error('Failed to check payment status:', error);
+        setHasPaidService(false);
+      } finally {
+        setCheckingPayment(false);
+      }
+    };
+
+    checkPaymentStatus();
+  }, [user]);
+
+  useEffect(() => {
+    if (user && hasPaidService) {
       const loadOrders = async () => {
         setLoading(true);
         await fetchOrders();
@@ -33,7 +59,7 @@ export default function ClientPortal() {
     } else {
       setLoading(false);
     }
-  }, [user]); // Remove fetchOrders dependency
+  }, [user, hasPaidService]); // Remove fetchOrders dependency
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -76,6 +102,8 @@ export default function ClientPortal() {
   };
 
   const handleApprove = async (orderId) => {
+    if (!user || !hasPaidService) return;
+    
     const result = await updateOrder(orderId, {
       action: 'addFeedback',
       type: 'APPROVAL',
@@ -91,6 +119,8 @@ export default function ClientPortal() {
   };
 
   const handleRequestChanges = async (orderId, feedback) => {
+    if (!user || !hasPaidService) return;
+    
     if (!feedback.trim()) {
       alert('Please enter your revision request details.');
       return;
@@ -111,6 +141,9 @@ export default function ClientPortal() {
     }
   };
 
+  const canUseService = user && hasPaidService;
+  const isDisabled = !user || !hasPaidService;
+
   return (
     <div className="min-h-screen" style={{ background: '#f4d03f' }}>
       <nav className="shadow-lg" style={{ background: '#f4d03f' }}>
@@ -118,7 +151,7 @@ export default function ClientPortal() {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <a href="/" style={{ textDecoration: 'none' }}>
-                <h1 className="text-2xl font-bold text-indigo-600" style={{ fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>NavaAiStudio</h1>
+                <h1 className="text-2xl font-bold text-indigo-600" style={{ fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>AiStudio7.com</h1>
               </a>
             </div>
             <div className="flex items-center space-x-4">
@@ -133,14 +166,14 @@ export default function ClientPortal() {
                 Home
               </a>
               <a 
-                href="/service-request" 
+                href="/services" 
                 className="hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium"
                 style={{
-                  fontWeight: pathname === '/service-request' ? 'bold' : 'normal',
-                  color: pathname === '/service-request' ? '#4f46e5' : '#374151'
+                  fontWeight: pathname === '/services' ? 'bold' : 'normal',
+                  color: pathname === '/services' ? '#4f46e5' : '#374151'
                 }}
               >
-                Service Request
+                Services
               </a>
               <a 
                 href="/client-portal" 
@@ -153,6 +186,16 @@ export default function ClientPortal() {
                 My Portal
               </a>
               <a 
+                href="/service-request" 
+                className="hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium"
+                style={{
+                  fontWeight: pathname === '/service-request' ? 'bold' : 'normal',
+                  color: pathname === '/service-request' ? '#4f46e5' : '#374151'
+                }}
+              >
+                Service Request
+              </a>
+              <a 
                 href="/sns-settings" 
                 className="hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium"
                 style={{
@@ -160,7 +203,7 @@ export default function ClientPortal() {
                   color: pathname === '/sns-settings' ? '#4f46e5' : '#374151'
                 }}
               >
-                Social Media Settings
+                SNS Settings
               </a>
               {user && user.role === 'ADMIN' && (
                 <a 
@@ -197,9 +240,38 @@ export default function ClientPortal() {
           <p className="text-gray-600">Track and manage your order status and progress</p>
         </div>
 
-        <div className="bg-white shadow-xl rounded-lg overflow-hidden">
+        {checkingPayment ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Checking payment status...</p>
+          </div>
+        ) : !user ? (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+            <h3 className="text-lg font-semibold text-blue-800 mb-2">Login Required</h3>
+            <p className="text-blue-700 mb-4">Please log in to access your client portal and view your orders.</p>
+            <button
+              onClick={() => window.location.href = '/login'}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            >
+              Go to Login
+            </button>
+          </div>
+        ) : !hasPaidService ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
+            <h3 className="text-lg font-semibold text-yellow-800 mb-2">Payment Required</h3>
+            <p className="text-yellow-700 mb-4">The client portal is only available to users with completed payments. Please purchase a service plan to access your order history and management features.</p>
+            <button
+              onClick={() => window.location.href = '/services'}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded"
+            >
+              View Services
+            </button>
+          </div>
+        ) : null}
+
+        <div className={`bg-white shadow-xl rounded-lg overflow-hidden ${isDisabled ? 'opacity-50' : ''}`}>
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Order List</h3>
+            <h3 className="text-lg font-medium text-gray-900">Order List {isDisabled && '(Disabled)'}</h3>
           </div>
 
           <div className="overflow-x-auto">
@@ -230,7 +302,13 @@ export default function ClientPortal() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {loading ? (
+                {!canUseService ? (
+                  <tr>
+                    <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
+                      {!user ? 'Please login to view your orders' : 'Payment required to access order history'}
+                    </td>
+                  </tr>
+                ) : loading ? (
                   <tr>
                     <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
                       Loading...
@@ -269,8 +347,9 @@ export default function ClientPortal() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <button
-                          onClick={() => setSelectedOrder(order)}
-                          className="text-indigo-600 hover:text-indigo-900"
+                          onClick={() => canUseService && setSelectedOrder(order)}
+                          className={`${canUseService ? 'text-indigo-600 hover:text-indigo-900' : 'text-gray-400 cursor-not-allowed'}`}
+                          disabled={!canUseService}
                         >
                           View Details
                         </button>
@@ -284,7 +363,7 @@ export default function ClientPortal() {
         </div>
 
         {/* Detail View Modal */}
-        {selectedOrder && (
+        {selectedOrder && canUseService && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
             <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
               <div className="mt-3">
@@ -517,12 +596,13 @@ export default function ClientPortal() {
                         )}
                       </div>
                       
-                      {selectedOrder.status === 'REVIEW' && (
+                      {selectedOrder.status === 'REVIEW' && canUseService && (
                         <div className="mt-4">
                           <div className="flex space-x-4 mb-4">
                             <button
                               onClick={() => handleApprove(selectedOrder.id)}
                               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+                              disabled={!canUseService}
                             >
                               Approve
                             </button>
@@ -533,6 +613,7 @@ export default function ClientPortal() {
                                 }
                               }}
                               className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded"
+                              disabled={!canUseService}
                             >
                               Request Changes
                             </button>
@@ -543,6 +624,7 @@ export default function ClientPortal() {
                             placeholder="Please enter your revision request details..."
                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-black"
                             rows="3"
+                            disabled={!canUseService}
                           />
                         </div>
                       )}

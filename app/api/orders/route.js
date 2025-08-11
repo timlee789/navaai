@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
-import { writeFile } from 'fs/promises';
-import path from 'path';
+import { uploadFile } from '@/lib/supabase';
 
 // Extract user information from token
 function getUserFromToken(request) {
@@ -38,26 +37,24 @@ export async function POST(request) {
     const orderCount = await prisma.order.count();
     const orderId = `ORD-${String(orderCount + 1).padStart(3, '0')}`;
 
-    // File upload processing
+    // File upload processing with Supabase Storage
     const fileData = [];
     for (let i = 0; formData.get(`file${i}`); i++) {
       const file = formData.get(`file${i}`);
       if (file && file.size > 0) {
         try {
-          const bytes = await file.arrayBuffer();
-          const buffer = Buffer.from(bytes);
+          const uploadResult = await uploadFile(file, 'uploads', 'orders');
           
-          const filename = `${Date.now()}-${Math.random().toString(36).substring(2)}-${file.name}`;
-          const filepath = path.join(process.cwd(), 'public', 'uploads', filename);
-          
-          await writeFile(filepath, buffer);
+          if (!uploadResult.success) {
+            throw new Error(uploadResult.error);
+          }
           
           fileData.push({
-            filename: filename,
-            originalName: file.name,
-            mimetype: file.type,
-            size: file.size,
-            path: `/uploads/${filename}`
+            filename: uploadResult.filename,
+            originalName: uploadResult.originalName,
+            mimetype: uploadResult.mimetype,
+            size: uploadResult.size,
+            path: uploadResult.url
           });
         } catch (uploadError) {
           console.error('File upload error:', uploadError);

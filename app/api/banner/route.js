@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
 import prisma from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
+import { uploadFile } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -79,17 +78,15 @@ export async function POST(request) {
       );
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    // Generate unique filename
-    const timestamp = Date.now();
-    const fileExtension = file.name.split('.').pop();
-    const filename = `banner_${timestamp}.${fileExtension}`;
-    const filepath = join(process.cwd(), 'public', 'uploads', filename);
-
-    // Save file
-    await writeFile(filepath, buffer);
+    // Upload file to Supabase Storage
+    const uploadResult = await uploadFile(file, 'uploads', 'banners');
+    
+    if (!uploadResult.success) {
+      return NextResponse.json(
+        { error: `File upload failed: ${uploadResult.error}` },
+        { status: 500 }
+      );
+    }
 
     // Deactivate existing banners
     await prisma.mainBanner.updateMany({
@@ -102,11 +99,11 @@ export async function POST(request) {
       data: {
         title,
         description,
-        filename,
-        originalName: file.name,
-        mimetype: file.type,
-        size: file.size,
-        path: `/uploads/${filename}`,
+        filename: uploadResult.filename,
+        originalName: uploadResult.originalName,
+        mimetype: uploadResult.mimetype,
+        size: uploadResult.size,
+        path: uploadResult.url,
         isActive: true
       }
     });

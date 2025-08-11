@@ -7,26 +7,40 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 사용자 프로필 로드
+  // 사용자 프로필 로드 - 더 간단하게
   const loadUser = async () => {
+    console.log('🔄 AuthContext: Starting loadUser...');
     try {
-      const response = await fetch('/api/user/profile');
+      const response = await fetch('/api/user/profile', {
+        method: 'GET',
+        credentials: 'include', // 쿠키 포함
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+      
+      console.log('📡 AuthContext: Profile API response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ AuthContext: User data loaded:', data.user);
         setUser(data.user);
       } else {
+        console.log('❌ AuthContext: Profile API failed, setting user to null');
         setUser(null);
       }
     } catch (error) {
-      console.error('User loading error:', error);
+      console.error('💥 AuthContext: User loading error:', error);
       setUser(null);
     } finally {
+      console.log('🏁 AuthContext: Setting loading to false');
       setLoading(false);
     }
   };
 
-  // Login
+  // Login - 더 간단하게
   const login = async (email, password) => {
+    console.log('🔐 AuthContext: Starting login for email:', email);
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -34,18 +48,23 @@ export function AuthProvider({ children }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
+        credentials: 'include', // 쿠키 포함
       });
 
+      console.log('📡 AuthContext: Login API response status:', response.status);
       const data = await response.json();
+      console.log('📊 AuthContext: Login API response data:', data);
 
       if (response.ok) {
+        console.log('✅ AuthContext: Login successful, setting user:', data.user);
         setUser(data.user);
         return { success: true, message: data.message, user: data.user };
       } else {
+        console.log('❌ AuthContext: Login failed:', data.error);
         return { success: false, error: data.error };
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('💥 AuthContext: Login error:', error);
       return { success: false, error: 'A network error occurred' };
     }
   };
@@ -59,6 +78,7 @@ export function AuthProvider({ children }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(userData),
+        credentials: 'include',
       });
 
       const data = await response.json();
@@ -76,11 +96,16 @@ export function AuthProvider({ children }) {
 
   // Logout
   const logout = async () => {
+    console.log('🚪 AuthContext: Starting logout...');
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include'
+      });
       setUser(null);
+      console.log('✅ AuthContext: Logout completed');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('💥 AuthContext: Logout error:', error);
     }
   };
 
@@ -93,6 +118,7 @@ export function AuthProvider({ children }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ snsSettings }),
+        credentials: 'include',
       });
 
       const data = await response.json();
@@ -109,9 +135,21 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // 초기 로드
   useEffect(() => {
+    console.log('🚀 AuthContext: Component mounted, loading user...');
     loadUser();
   }, []);
+
+  // 사용자 상태 변경 시 로그
+  useEffect(() => {
+    console.log('👤 AuthContext: User state changed:', user ? `${user.email} (${user.id})` : 'null');
+  }, [user]);
+
+  // 로딩 상태 변경 시 로그
+  useEffect(() => {
+    console.log('⏳ AuthContext: Loading state changed:', loading);
+  }, [loading]);
 
   const value = {
     user,

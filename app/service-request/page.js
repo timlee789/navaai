@@ -12,6 +12,8 @@ export default function ServiceRequest() {
   const [dueDate, setDueDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [hasPaidService, setHasPaidService] = useState(false);
+  const [checkingPayment, setCheckingPayment] = useState(true);
   
   // AI Generation states
   const [enableAIGeneration, setEnableAIGeneration] = useState(false);
@@ -156,6 +158,30 @@ export default function ServiceRequest() {
     setFiles(prev => [...prev, generatedFile]);
   };
 
+  // Check payment status when user changes
+  useEffect(() => {
+    const checkPaymentStatus = async () => {
+      if (!user) {
+        setHasPaidService(false);
+        setCheckingPayment(false);
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/user/payment-status');
+        const data = await response.json();
+        setHasPaidService(data.hasPaidService);
+      } catch (error) {
+        console.error('Failed to check payment status:', error);
+        setHasPaidService(false);
+      } finally {
+        setCheckingPayment(false);
+      }
+    };
+
+    checkPaymentStatus();
+  }, [user]);
+
   // Clean up object URLs when component unmounts
   useEffect(() => {
     return () => {
@@ -173,6 +199,11 @@ export default function ServiceRequest() {
     
     if (!user) {
       router.push('/login');
+      return;
+    }
+
+    if (!hasPaidService) {
+      setError('This service requires a completed payment. Please purchase a service plan to access this feature.');
       return;
     }
 
@@ -199,6 +230,9 @@ export default function ServiceRequest() {
     setIsSubmitting(false);
   };
 
+  const canUseService = user && hasPaidService;
+  const isDisabled = !user || !hasPaidService;
+
   return (
     <div className="min-h-screen" style={{ background: '#f4d03f' }}>
       <nav className="shadow-lg" style={{ background: '#f4d03f' }}>
@@ -206,7 +240,7 @@ export default function ServiceRequest() {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <a href="/" style={{ textDecoration: 'none' }}>
-                <h1 className="text-2xl font-bold text-indigo-600" style={{ fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>NavaAiStudio</h1>
+                <h1 className="text-2xl font-bold text-indigo-600" style={{ fontFamily: 'Myriad Pro, Arial, sans-serif', cursor: 'pointer' }}>AiStudio7.com</h1>
               </a>
             </div>
             <div className="flex items-center space-x-4">
@@ -219,6 +253,16 @@ export default function ServiceRequest() {
                 }}
               >
                 Home
+              </a>
+              <a 
+                href="/services" 
+                className="hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium"
+                style={{
+                  fontWeight: pathname === '/services' ? 'bold' : 'normal',
+                  color: pathname === '/services' ? '#4f46e5' : '#374151'
+                }}
+              >
+                Services
               </a>
               <a 
                 href="/client-portal" 
@@ -283,6 +327,35 @@ export default function ServiceRequest() {
         <div className="bg-white rounded-lg shadow-xl p-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-8">Service Request</h2>
           
+          {checkingPayment ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Checking payment status...</p>
+            </div>
+          ) : !user ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+              <h3 className="text-lg font-semibold text-blue-800 mb-2">Login Required</h3>
+              <p className="text-blue-700 mb-4">Please log in to access the service request feature.</p>
+              <button
+                onClick={() => router.push('/login')}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+              >
+                Go to Login
+              </button>
+            </div>
+          ) : !hasPaidService ? (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
+              <h3 className="text-lg font-semibold text-yellow-800 mb-2">Payment Required</h3>
+              <p className="text-yellow-700 mb-4">This feature is only available to users with completed payments. Please purchase a service plan to access service requests.</p>
+              <button
+                onClick={() => router.push('/services')}
+                className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded"
+              >
+                View Services
+              </button>
+            </div>
+          ) : null}
+          
           <form onSubmit={handleSubmit} className="space-y-8">
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
@@ -300,9 +373,10 @@ export default function ServiceRequest() {
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-black"
-                placeholder="Enter a title"
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-black ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                placeholder={canUseService ? "Enter a title" : !user ? "Please login to access service request" : "Payment required to access service request"}
                 required
+                disabled={isDisabled}
               />
             </div>
             {/* File upload section */}
@@ -310,7 +384,7 @@ export default function ServiceRequest() {
               <label className="block text-lg font-medium text-gray-700 mb-4">
                 Image/Video Upload
               </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8">
+              <div className={`border-2 border-dashed border-gray-300 rounded-lg p-8 ${isDisabled ? 'opacity-50' : ''}`}>
                 <input
                   type="file"
                   multiple
@@ -318,16 +392,21 @@ export default function ServiceRequest() {
                   onChange={handleFileUpload}
                   className="hidden"
                   id="file-upload"
+                  disabled={isDisabled}
                 />
                 <label
                   htmlFor="file-upload"
-                  className="cursor-pointer flex flex-col items-center"
+                  className={`${canUseService ? 'cursor-pointer' : 'cursor-not-allowed'} flex flex-col items-center`}
                 >
                   <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
                     <span className="text-3xl">📁</span>
                   </div>
-                  <span className="text-lg text-gray-600">Select files or drag and drop</span>
-                  <span className="text-sm text-gray-500 mt-2">Image and video files supported</span>
+                  <span className="text-lg text-gray-600">
+                    {canUseService ? 'Select files or drag and drop' : !user ? 'Please login to upload files' : 'Payment required to upload files'}
+                  </span>
+                  <span className="text-sm text-gray-500 mt-2">
+                    {canUseService ? 'Image and video files supported' : !user ? 'Login required' : 'Payment required'}
+                  </span>
                 </label>
               </div>
 
@@ -413,14 +492,15 @@ export default function ServiceRequest() {
                 rows={6}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-black"
-                placeholder="Please describe in detail the content creation you would like..."
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-black ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                placeholder={canUseService ? "Please describe in detail the content creation you would like..." : !user ? "Please login to access service request" : "Payment required to access service request"}
                 required
+                disabled={isDisabled}
               />
             </div>
 
             {/* AI Content Generation Section */}
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-lg border-2 border-purple-200">
+            <div className={`bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-lg border-2 border-purple-200 ${isDisabled ? 'opacity-50' : ''}`}>
               <div className="flex items-center mb-4">
                 <input
                   type="checkbox"
@@ -428,9 +508,10 @@ export default function ServiceRequest() {
                   checked={enableAIGeneration}
                   onChange={(e) => setEnableAIGeneration(e.target.checked)}
                   className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                  disabled={isDisabled}
                 />
                 <label htmlFor="ai-generation" className="ml-3 block text-lg font-medium text-gray-900">
-                  🤖 Enable AI Content Generation
+                  🤖 Enable AI Content Generation {!user ? '(Login required)' : !hasPaidService ? '(Payment required)' : ''}
                 </label>
               </div>
               
@@ -559,7 +640,8 @@ export default function ServiceRequest() {
                 <select 
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-black"
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-black ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={isDisabled}
                 >
                   <option value="Normal">Normal</option>
                   <option value="Urgent">Urgent</option>
@@ -575,7 +657,8 @@ export default function ServiceRequest() {
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-black"
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-black ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={isDisabled}
                 />
               </div>
             </div>
@@ -591,10 +674,10 @@ export default function ServiceRequest() {
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || files.length === 0 || !title.trim() || !description.trim()}
+                disabled={isDisabled || isSubmitting || files.length === 0 || !title.trim() || !description.trim()}
                 className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Submitting...' : 'Submit Service Request'}
+                {!user ? 'Login Required' : !hasPaidService ? 'Payment Required' : isSubmitting ? 'Submitting...' : 'Submit Service Request'}
               </button>
             </div>
           </form>

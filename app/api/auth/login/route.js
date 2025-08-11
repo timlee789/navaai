@@ -67,11 +67,22 @@ export async function POST(request) {
     );
 
     // Set token as HTTP-only cookie
+    console.log('Login API: Setting cookie with token for user:', user.id);
     response.cookies.set('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
+      path: '/',
       maxAge: 7 * 24 * 60 * 60 // 7 days
+    });
+
+    console.log('Login API: Cookie settings:', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60,
+      tokenLength: token.length
     });
 
     return response;

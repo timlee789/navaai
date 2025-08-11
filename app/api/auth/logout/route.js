@@ -8,10 +8,12 @@ export async function POST() {
     );
 
     // Delete token cookie
+    console.log('Logout API: Clearing token cookie');
     response.cookies.set('token', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
+      path: '/',
       maxAge: 0
     });
 
